@@ -1,0 +1,36 @@
+Project Structure
+First, let's establish the full project structure:
+agentic-mfapi-ai/
+├── app/
+│   ├── agents/
+│   │   ├── _init_.py
+│   │   ├── fund_agent.py           # Main LangGraph agent
+│   │   ├── nodes.py                # Agent nodes (searcher, summarizer, etc.)
+│   │   └── prompts.py              # Agent prompts
+│   ├── api/
+│   │   ├── _init_.py
+│   │   ├── routes.py               # API routes
+│   │   └── dependencies.py         # API dependencies
+│   ├── services/
+│   │   ├── _init_.py
+│   │   └── mfapi_service.py        # mfapi.in client
+│   ├── schemas/
+│   │   ├── _init_.py
+│   │   ├── fund.py                 # Fund models
+│   │   └── request.py              # Request/response models
+│   ├── core/
+│   │   ├── _init_.py
+│   │   ├── config.py               # App configuration
+│   │   └── llm.py                  # LLM client
+│   └── main.py                     # FastAPI entrypoint
+├── tests/
+│   ├── _init_.py
+│   ├── conftest.py
+│   ├── test_agents.py
+│   ├── test_api.py
+│   └── test_services.py
+├── .env.example                    # Environment variables template
+├── .gitignore
+├── README.md
+├── requirements.txt
+└── docker-compose.yml
