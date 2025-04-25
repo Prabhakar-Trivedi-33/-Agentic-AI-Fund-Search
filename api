@@ -1,0 +1,16 @@
+api/ — FastAPI Endpoints
+This folder contains the FastAPI routes that expose the app’s features via RESTful APIs.
+
+Each route connects with services or agents to handle tasks like:
+
+ Searching mutual funds
+GET /funds/search?q=...
+
+ Getting fund details by scheme code
+GET /funds/{scheme_code}
+
+ Comparing multiple funds
+POST /funds/compare
+
+ Answering natural language questions using AI agents
+POST /ai/query
