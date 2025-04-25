@@ -1,0 +1,22 @@
+ schemas/ — Data Models (Pydantic)
+This folder contains the Pydantic models that define the structure of data used in requests and responses.
+
+These models help:
+
+✅ Validate incoming API data
+
+✅ Document the API using FastAPI’s automatic docs
+
+✅ Keep your code clean and consistent
+
+For example:
+
+FundSearchRequest – structure for /funds/search query
+
+CompareRequest – input for comparing funds
+
+AIQueryRequest – structure for the /ai/query input
+
+FundResponse – what the API returns about a mutual fund
+
+These models make sure the app knows what kind of data it’s working with at every step.
