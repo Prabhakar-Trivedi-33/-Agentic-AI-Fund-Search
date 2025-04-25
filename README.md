@@ -3,7 +3,7 @@
 
 A production-grade, scalable FastAPI application that integrates an agentic AI system using LangGraph, enabling intelligent search, summarization, and reasoning over mutual fund data from MFAPI.in.
 
-## 🚀 Features
+## Features
 
 - *Agentic AI Framework*: Built with LangGraph for intelligent reasoning
 - *Real-time Fund Data*: Connects to MFAPI.in for latest mutual fund information
@@ -12,7 +12,7 @@ A production-grade, scalable FastAPI application that integrates an agentic AI s
 - *Streaming Responses*: Get real-time streaming responses from the AI
 - *Production Ready*: Built with FastAPI for high performance and scaling
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - FastAPI
 - LangGraph
@@ -22,7 +22,7 @@ A production-grade, scalable FastAPI application that integrates an agentic AI s
 - Pytest
 - Docker
 
-## 📋 API Endpoints
+## API Endpoints
 
 - GET /funds/search?q=bluechip - Search for funds by name/keyword
 - GET /funds/{scheme_code} - Get details for a specific fund
@@ -30,7 +30,7 @@ A production-grade, scalable FastAPI application that integrates an agentic AI s
 - POST /ai/query - Ask questions in natural language
 - POST /ai/query/stream - Stream AI responses for questions
 
-## 🔧 Setup & Installation
+## Setup & Installation
 
 ### Using Docker
 
@@ -75,7 +75,7 @@ bash
 pytest
 
 
-## 📚 Example Usage
+## Example Usage
 
 ### Ask a Question
 
@@ -105,7 +105,7 @@ curl -X POST "http://localhost:8000/api/funds/compare" \
   -d '{"scheme_codes": [119010, 120465], "period": "1y"}'
 
 
-## 🔄 Project Structure
+## Project Structure
 
 
 agentic-mfapi-ai/
