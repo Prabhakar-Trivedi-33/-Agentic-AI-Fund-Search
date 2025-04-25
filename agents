@@ -1,0 +1,356 @@
+This directory contains LangGraph agent nodes, graph construction, and routing logic.
+7. LangGraph Agent Components
+# System prompts for different agent nodes
+
+FUND_AGENT_SYSTEM_PROMPT = """
+You are a financial advisor specialized in Indian mutual funds. Your job is to provide accurate information and analysis about mutual funds based on the data available to you.
+
+You have access to the following tools:
+1. search_funds - Search for mutual funds by name or keywords
+2. get_fund_details - Get detailed information about a specific mutual fund
+3. compare_funds - Compare multiple mutual funds over a specified period
+
+Always be factual and base your answers on the data. If you don't have enough information, state so clearly and suggest what additional data might be needed.
+"""
+
+FUND_SEARCHER_PROMPT = """
+You are a mutual fund search expert. Your job is to extract key search terms from user questions about mutual funds.
+
+EXAMPLES:
+Question: "Which large cap mutual funds performed best in the last 1 year?"
+Search terms: "large cap mutual funds"
+
+Question: "Tell me about HDFC Top 100 fund"
+Search terms: "HDFC Top 100"
+
+Question: "Compare Axis Bluechip with ICICI Bluechip"
+Search terms: "Axis Bluechip, ICICI Bluechip"
+
+Based on the user question, extract the relevant search terms that will help find the correct mutual funds.
+"""
+
+SUMMARIZER_PROMPT = """
+You are a financial data summarizer. Your task is to create clear, concise summaries of mutual fund data.
+
+Your summary should:
+1. Highlight key performance metrics
+2. Compare against relevant benchmarks
+3. Mention important risk factors
+4. Structure information in a readable format
+5. Use simple language avoiding unnecessary jargon
+
+Use the provided mutual fund data to create an informative summary.
+"""
+
+COMPARATOR_PROMPT = """
+You are a mutual fund comparison specialist. Your task is to compare multiple mutual funds and highlight the key differences.
+
+Your comparison should:
+1. Compare performance across different time periods
+2. Analyze risk metrics and volatility
+3. Contrast investment strategies
+4. Examine expense ratios and fees
+5. Consider fund size and management
+6. Provide a balanced view of strengths and weaknesses
+
+Use the provided mutual fund data to create a fair and insightful comparison.
+"""
+
+ROUTER_PROMPT = """
+You are a question analyzer for a mutual fund information system. Your task is to determine what type of information is being requested in a user's question.
+
+Categories:
+1. SEARCH - User is looking for funds matching certain criteria
+2. DETAILS - User wants specific information about a named fund
+3. COMPARE - User wants to compare two or more funds
+4. PERFORMANCE - User is asking about fund performance
+5. GENERAL - General questions about mutual funds
+
+Analyze the question and choose the most appropriate category.
+"""
+
+import json
+import re
+from typing import Dict, List, Any, Tuple, Optional
+from pydantic import BaseModel
+
+from langchain.prompts import PromptTemplate
+from langchain.schema import HumanMessage, SystemMessage
+
+from app.core.llm import get_llm
+from app.services.mfapi_service import MFAPIService
+from app.agents.prompts import (
+    FUND_SEARCHER_PROMPT,
+    SUMMARIZER_PROMPT,
+    COMPARATOR_PROMPT,
+    ROUTER_PROMPT
+)
+
+class AgentState(BaseModel):
+    """State object for the fund agent"""
+    question: str
+    search_terms: Optional[List[str]] = None
+    fund_codes: Optional[List[int]] = None
+    fund_details: Optional[List[Dict[str, Any]]] = None
+    comparison_results: Optional[Dict[str, Any]] = None
+    answer: Optional[str] = None
+    question_type: Optional[str] = None
+    error: Optional[str] = None
+
+# Node for determining the question type
+async def question_router(state: AgentState) -> AgentState:
+    """Route the question to the appropriate handler"""
+    llm = get_llm()
+    
+    messages = [
+        SystemMessage(content=ROUTER_PROMPT),
+        HumanMessage(content=f"Question: {state.question}\n\nWhat category does this question fall into?")
+    ]
+    
+    response = llm.invoke(messages)
+    
+    # Extract the category
+    content = response.content.strip().upper()
+    if "SEARCH" in content:
+        state.question_type = "SEARCH"
+    elif "COMPARE" in content:
+        state.question_type = "COMPARE"
+    elif "DETAILS" in content:
+        state.question_type = "DETAILS"
+    elif "PERFORMANCE" in content:
+        state.question_type = "PERFORMANCE"
+    else:
+        state.question_type = "GENERAL"
+    
+    return state
+
+# Node for extracting search terms
+async def fund_searcher(state: AgentState) -> AgentState:
+    """Extract search terms from the question"""
+    llm = get_llm()
+    
+    messages = [
+        SystemMessage(content=FUND_SEARCHER_PROMPT),
+        HumanMessage(content=f"Question: {state.question}\n\nExtract the relevant search terms:")
+    ]
+    
+    response = llm.invoke(messages)
+    content = response.content.strip()
+    
+    # Extract search terms, handling different formats
+    search_terms = []
+    if ":" in content:
+        # Handle response in "Search terms: term1, term2" format
+        terms_part = content.split(":", 1)[1].strip()
+        search_terms = [term.strip() for term in terms_part.split(",")]
+    else:
+        # Handle plain text response
+        search_terms = [term.strip() for term in content.split(",")]
+    
+    state.search_terms = search_terms
+    
+    # Use MFAPI service to search for funds
+    mfapi_service = MFAPIService()
+    fund_codes = []
+    
+    for term in search_terms:
+        try:
+            results = await mfapi_service.search_funds_by_name(term)
+            if results:
+                # Add first matching fund code
+                fund_codes.append(results[0].scheme_code)
+        except Exception as e:
+            state.error = f"Error searching for funds: {str(e)}"
+    
+    state.fund_codes = fund_codes
+    return state
+
+# Node for getting fund details
+async def fund_details_fetcher(state: AgentState) -> AgentState:
+    """Fetch details for the identified funds"""
+    if not state.fund_codes:
+        state.error = "No fund codes identified to fetch details"
+        return state
+    
+    mfapi_service = MFAPIService()
+    fund_details = []
+    
+    for code in state.fund_codes:
+        try:
+            fund = await mfapi_service.get_fund_details(code)
+            fund_details.append(fund.dict())
+        except Exception as e:
+            state.error = f"Error fetching fund details: {str(e)}"
+    
+    state.fund_details = fund_details
+    return state
+
+# Node for comparing funds
+async def fund_comparator(state: AgentState) -> AgentState:
+    """Compare multiple funds"""
+    if not state.fund_codes or len(state.fund_codes) < 2:
+        state.error = "Need at least two fund codes to compare"
+        return state
+    
+    mfapi_service = MFAPIService()
+    
+    # Extract period from question if present (default to 1y)
+    period_match = re.search(r'(\d+)\s*(year|yr|month|m|y)', state.question.lower())
+    period = "1y"  # default
+    
+    if period_match:
+        value = period_match.group(1)
+        unit = period_match.group(2)[0]  # first letter (y or m)
+        
+        if unit == 'y':
+            if value == '1':
+                period = "1y"
+            elif value == '3':
+                period = "3y"
+            elif value == '5':
+                period = "5y"
+        elif unit == 'm':
+            if value == '1':
+                period = "1m"
+            elif value == '3':
+                period = "3m"
+            elif value == '6':
+                period = "6m"
+    
+    try:
+        comparison = await mfapi_service.compare_funds(state.fund_codes, period)
+        state.comparison_results = comparison
+    except Exception as e:
+        state.error = f"Error comparing funds: {str(e)}"
+    
+    return state
+
+# Node for summarizing fund details
+async def summarizer(state: AgentState) -> AgentState:
+    """Generate a summary based on fund details"""
+    if state.error:
+        state.answer = f"I encountered an error: {state.error}"
+        return state
+        
+    llm = get_llm()
+    
+    # Prepare context for the LLM based on what we have
+    context = ""
+    
+    if state.question_type == "COMPARE" and state.comparison_results:
+        # Format comparison results
+        context = f"Comparison results: {json.dumps(state.comparison_results, indent=2)}"
+        system_prompt = COMPARATOR_PROMPT
+    elif state.fund_details:
+        # Format fund details
+        context = f"Fund details: {json.dumps(state.fund_details, indent=2)}"
+        system_prompt = SUMMARIZER_PROMPT
+    else:
+        state.answer = "I don't have enough information to answer your question."
+        return state
+    
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=f"Question: {state.question}\n\nData:\n{context}\n\nPlease provide a summary:")
+    ]
+    
+    response = llm.invoke(messages)
+    state.answer = response.content.strip()
+    
+    return state
+
+from typing import Dict, List, Any, Annotated
+from langgraph.graph import StateGraph, END
+
+from app.agents.nodes import (
+    AgentState,
+    question_router,
+    fund_searcher,
+    fund_details_fetcher,
+    fund_comparator,
+    summarizer
+)
+
+def build_fund_agent() -> StateGraph:
+    """Build the fund agent workflow graph"""
+    
+    # Create the graph
+    workflow = StateGraph(AgentState)
+    
+    # Add nodes
+    workflow.add_node("question_router", question_router)
+    workflow.add_node("fund_searcher", fund_searcher)
+    workflow.add_node("fund_details_fetcher", fund_details_fetcher)
+    workflow.add_node("fund_comparator", fund_comparator)
+    workflow.add_node("summarizer", summarizer)
+    
+    # Define edges - always start with question_router
+    workflow.add_edge("question_router", "fund_searcher")
+    
+    # From fund_searcher, route based on question type
+    workflow.add_conditional_edges(
+        "fund_searcher",
+        lambda state: state.question_type,
+        {
+            "COMPARE": "fund_comparator",
+            "SEARCH": "fund_details_fetcher", 
+            "DETAILS": "fund_details_fetcher",
+            "PERFORMANCE": "fund_details_fetcher",
+            "GENERAL": "summarizer"
+        }
+    )
+    
+    # After fetching details or comparing, always summarize
+    workflow.add_edge("fund_details_fetcher", "summarizer")
+    workflow.add_edge("fund_comparator", "summarizer")
+    
+    # End after summarization
+    workflow.add_edge("summarizer", END)
+    
+    # Compile the graph
+    return workflow.compile()
+
+# Function to run the agent
+async def run_fund_agent(question: str) -> Dict[str, Any]:
+    """Execute the fund agent with a given question"""
+    
+    # Initialize the agent state
+    initial_state = AgentState(question=question)
+    
+    # Build and run the agent
+    agent = build_fund_agent()
+    result = await agent.ainvoke(initial_state)
+    
+    # Return results
+    return {
+        "summary": result.answer if result.answer else "I couldn't generate an answer.",
+        "details": {
+            "question_type": result.question_type,
+            "search_terms": result.search_terms,
+            "fund_codes": result.fund_codes,
+            "error": result.error
+        }
+    }
+
+# Function to run the agent with streaming
+async def stream_fund_agent(question: str):
+    """Execute the fund agent with streaming"""
+    
+    # Initialize the agent state
+    initial_state = AgentState(question=question)
+    
+    # Build the agent
+    agent = build_fund_agent()
+    
+    # Stream the results
+    async for event in agent.astream(initial_state):
+        if event["step"] == "summarizer" and event["value"] is not None and event["value"].answer:
+            yield event["value"].answer
+        elif event["step"] == "question_router":
+            yield "Analyzing your question..."
+        elif event["step"] == "fund_searcher":
+            yield "Searching for relevant funds..."
+        elif event["step"] == "fund_details_fetcher":
+            yield "Fetching fund details..."
+        elif event["step"] == "fund_comparator":
+            yield "Comparing the funds..."
