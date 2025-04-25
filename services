@@ -1,0 +1,18 @@
+services/ — External API Integration
+This folder contains all the code that talks to external services, especially MFAPI.in.
+
+It acts like a bridge between your app and external data.
+
+Here’s what typically goes here:
+
+mfapi.py – Functions to:
+
+1.Search mutual funds by name
+
+2. Get details of a mutual fund by scheme code
+
+3. Compare multiple mutual funds
+
+These service functions are used by your agents and API routes to get real-time data from mfapi.in.
+
+By keeping them in one place, it's easy to update or switch APIs later without touching other parts of the app.
