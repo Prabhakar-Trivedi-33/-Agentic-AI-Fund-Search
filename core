@@ -1,0 +1,21 @@
+ core/ — Core Configuration & Utilities
+This folder contains the essential setup and shared utilities for the project, including:
+
+ API Keys & Environment Config
+Configuration using BaseSettings from Pydantic to load values from .env.
+
+LLM Client Setup
+Code to connect with OpenAI (or a mock) for handling AI-powered answers.
+
+Common utilities
+Any helper functions or shared logic used across the app.
+
+Examples of what lives here:
+
+config.py – loads settings like OpenAI API keys and base URLs.
+
+llm.py – a wrapper around OpenAI’s chat API.
+
+logging.py (optional) – custom logging config.
+
+This keeps your app clean, centralized, and easy to manage.
