@@ -1,0 +1,39 @@
+agentic-fund-search/
+├── app/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   └── llm.py
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   ├── fund.py
+│   │   └── request.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   └── mfapi_service.py
+│   ├── agents/
+│   │   ├── __init__.py
+│   │   ├── prompts.py
+│   │   ├── nodes.py
+│   │   └── fund_agent.py
+│   └── api/
+│       ├── __init__.py
+│       └── routes.py
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py
+│   ├── test_api.py
+│   ├── test_services.py
+│   ├── test_agents.py
+│   └── data/
+│       ├── sample_fund.json
+│       ├── sample_search.json
+│       └── sample_comparison.json
+├── .env.example
+├── .gitignore
+├── docker-compose.yml
+├── Dockerfile
+├── README.md
+└── requirements.txt
